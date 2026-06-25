@@ -1,0 +1,53 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Editor and OS metadata
+.idea/
+.vscode/
+.DS_Store
+
+# Local datasets and processed data
+data/
+
+# Training checkpoints and experiment outputs
+checkpoints*/
+lightning_logs/
+wandb/
+csv_logs/
+
+# Generated results and evaluation artifacts
+results/
+evaluation_results/
+figures/
+samples/
+
+# Large/generated scientific artifacts
+*.pt
+*.pth
+*.ckpt
+*.pkl
+*.sdf
+*.pdb
+*.mol2
+*.csv
+*.npz
+*.npy
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+tmp/
+temp/

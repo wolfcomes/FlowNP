@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import random
 from pathlib import Path
 from typing import Sequence
@@ -26,7 +27,7 @@ def non_negative_int(value: str) -> int:
     return parsed
 
 
-def load_valid_molecules(input_path: Path) -> list[Chem.Mol]:
+def load_valid_molecules_from_sdf(input_path: Path) -> list[Chem.Mol]:
     if not input_path.is_file():
         raise FileNotFoundError(f"Input SDF file not found: {input_path}")
 
@@ -39,6 +40,40 @@ def load_valid_molecules(input_path: Path) -> list[Chem.Mol]:
 
     if not molecules:
         raise ValueError(f"No valid molecules were found in {input_path}")
+
+    return molecules
+
+
+def load_valid_molecules_from_csv(input_path: Path, smiles_column: str, name_column: str | None) -> list[Chem.Mol]:
+    if not input_path.is_file():
+        raise FileNotFoundError(f"Input CSV file not found: {input_path}")
+
+    molecules: list[Chem.Mol] = []
+    with input_path.open(newline="", encoding="utf-8-sig") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames is None:
+            raise ValueError(f"CSV file is missing a header row: {input_path}")
+        if smiles_column not in reader.fieldnames:
+            available = ", ".join(reader.fieldnames)
+            raise ValueError(f"Column '{smiles_column}' was not found in {input_path}. Available columns: {available}")
+
+        for row_idx, row in enumerate(reader, start=1):
+            smiles = (row.get(smiles_column) or "").strip()
+            if not smiles:
+                continue
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is None:
+                continue
+            if name_column and row.get(name_column):
+                mol.SetProp("_Name", row[name_column].strip())
+            elif row.get("Name"):
+                mol.SetProp("_Name", row["Name"].strip())
+            else:
+                mol.SetProp("_Name", f"row_{row_idx}")
+            molecules.append(mol)
+
+    if not molecules:
+        raise ValueError(f"No valid SMILES were found in {input_path}")
 
     return molecules
 
@@ -75,9 +110,13 @@ def select_molecules(
 
 
 def prepare_molecule_for_drawing(mol: Chem.Mol) -> Chem.Mol:
-    drawable = Chem.Mol(mol)
-    if not drawable.GetNumConformers():
-        AllChem.Compute2DCoords(drawable)
+    smiles = Chem.MolToSmiles(mol, isomericSmiles=True)
+    drawable = Chem.MolFromSmiles(smiles)
+    if drawable is None:
+        drawable = Chem.Mol(mol)
+    AllChem.Compute2DCoords(drawable)
+    if mol.HasProp("_Name"):
+        drawable.SetProp("_Name", mol.GetProp("_Name"))
     return drawable
 
 
@@ -107,8 +146,12 @@ def draw_molecule_grid(
     mols_per_row: int,
     sub_img_size: int,
     legend_mode: str,
+    preserve_coordinates: bool,
 ) -> None:
-    drawable_mols = [prepare_molecule_for_drawing(mol) for mol in molecules]
+    if preserve_coordinates:
+        drawable_mols = [Chem.Mol(mol) for mol in molecules]
+    else:
+        drawable_mols = [prepare_molecule_for_drawing(mol) for mol in molecules]
     legends = [legend_for_molecule(mol, idx, legend_mode) for idx, mol in enumerate(drawable_mols)]
     image = Draw.MolsToGridImage(
         drawable_mols,
@@ -126,10 +169,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Select generated molecules from an SDF file and save a 2D visualization grid."
     )
-    parser.add_argument(
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument(
         "--input",
-        required=True,
         help="Input SDF file containing generated molecules.",
+    )
+    input_group.add_argument(
+        "--input-csv",
+        help="Input CSV file containing generated molecule SMILES.",
+    )
+    parser.add_argument(
+        "--smiles-column",
+        default="smiles",
+        help="SMILES column name when using --input-csv. Defaults to smiles.",
+    )
+    parser.add_argument(
+        "--name-column",
+        default="Name",
+        help="Optional molecule name column when using --input-csv. Defaults to Name.",
     )
     parser.add_argument(
         "--output",
@@ -187,17 +244,26 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Show RDKit warnings for invalid molecules while reading the input SDF.",
     )
+    parser.add_argument(
+        "--preserve-sdf-coordinates",
+        action="store_true",
+        help="Use coordinates stored in the SDF instead of regenerating clean 2D depictions.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    input_path = Path(args.input).expanduser().resolve()
+    input_path = Path(args.input or args.input_csv).expanduser().resolve()
     output_path = Path(args.output).expanduser().resolve()
     output_sdf = Path(args.output_sdf).expanduser().resolve() if args.output_sdf else None
 
     configure_rdkit_logging(args.show_rdkit_warnings)
-    molecules = load_valid_molecules(input_path)
+    if args.input_csv:
+        name_column = args.name_column if args.name_column else None
+        molecules = load_valid_molecules_from_csv(input_path, args.smiles_column, name_column)
+    else:
+        molecules = load_valid_molecules_from_sdf(input_path)
     selected = select_molecules(
         molecules=molecules,
         count=args.count,
@@ -212,6 +278,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         mols_per_row=args.mols_per_row,
         sub_img_size=args.sub_img_size,
         legend_mode=args.legend,
+        preserve_coordinates=args.preserve_sdf_coordinates,
     )
 
     if output_sdf is not None:

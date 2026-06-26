@@ -100,12 +100,21 @@ class PlotLossCurvesCliTests(unittest.TestCase):
                 rows = list(csv.DictReader(handle))
 
             self.assertEqual([int(row["knn_connectivity"]) for row in rows], [8, 12, 16, 24, 32])
+            self.assertNotIn("early_train_drop_rate", rows[0])
+            self.assertNotIn("early_val_drop_rate", rows[0])
             plateau_rows = [row for row in rows if row["is_plateau_candidate"] == "True"]
             self.assertTrue(any(int(row["knn_connectivity"]) == 24 for row in plateau_rows))
 
             recommendation_text = (output_dir / "knn_recommendation.txt").read_text(encoding="utf-8")
             self.assertIn("Recommended K: 24", recommendation_text)
             self.assertIn("relative_improvement_vs_prev_k", recommendation_text)
+            self.assertNotIn("early_val_drop_rate", recommendation_text)
+
+    def test_knn_main_figure_source_excludes_early_drop_rate_panel(self) -> None:
+        source = SCRIPT_PATH.read_text(encoding="utf-8")
+
+        self.assertNotIn("Early-stage Loss Drop Rate", source)
+        self.assertNotIn("Average validation loss drop / progress", source)
 
 
 if __name__ == "__main__":

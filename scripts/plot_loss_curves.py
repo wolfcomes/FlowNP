@@ -346,15 +346,6 @@ def compute_slope(x_values: Sequence[float], y_values: Sequence[float]) -> float
     return float(np.polyfit(x_array, y_array, deg=1)[0])
 
 
-def compute_drop_rate(x_values: Sequence[float], y_values: Sequence[float]) -> float:
-    if len(x_values) < 2 or len(y_values) < 2:
-        return 0.0
-    delta_x = float(x_values[-1]) - float(x_values[0])
-    if abs(delta_x) < EPSILON:
-        return 0.0
-    return float((float(y_values[0]) - float(y_values[-1])) / delta_x)
-
-
 def tail_std(values: Sequence[float]) -> float:
     if len(values) <= 1:
         return 0.0
@@ -363,7 +354,6 @@ def tail_std(values: Sequence[float]) -> float:
 
 def build_summary_dataframe(
     runs: Sequence[ExperimentRun],
-    early_fraction: float,
     late_fraction: float,
     improvement_threshold_pct: float,
     convergence_ratio_threshold: float,
@@ -396,21 +386,18 @@ def build_summary_dataframe(
         val_x = raw_val_series.x_values
         val_y = raw_val_series.y_values
 
-        early_train_count = window_length(len(train_y), early_fraction)
-        early_val_count = window_length(len(val_y), early_fraction)
         late_train_count = window_length(len(train_y), late_fraction)
         late_val_count = window_length(len(val_y), late_fraction)
 
-        early_train_drop_rate = compute_drop_rate(train_x[:early_train_count], train_y[:early_train_count])
-        early_val_drop_rate = compute_drop_rate(val_x[:early_val_count], val_y[:early_val_count])
         late_train_slope = compute_slope(train_x[-late_train_count:], train_y[-late_train_count:])
         late_val_slope = compute_slope(val_x[-late_val_count:], val_y[-late_val_count:])
-        convergence_ratio = abs(late_val_slope) / max(abs(early_val_drop_rate), EPSILON)
 
         best_train_loss = float(min(train_y))
         final_train_loss = float(train_y[-1])
         best_val_loss = float(min(val_y))
         final_val_loss = float(val_y[-1])
+        late_val_std = tail_std(val_y[-late_val_count:])
+        convergence_ratio = abs(late_val_slope) / max(abs(best_val_loss), EPSILON)
 
         summary_rows.append(
             {
@@ -422,12 +409,10 @@ def build_summary_dataframe(
                 "final_train_loss": final_train_loss,
                 "best_val_loss": best_val_loss,
                 "final_val_loss": final_val_loss,
-                "early_train_drop_rate": early_train_drop_rate,
-                "early_val_drop_rate": early_val_drop_rate,
                 "late_train_slope": late_train_slope,
                 "late_val_slope": late_val_slope,
                 "late_train_std": tail_std(train_y[-late_train_count:]),
-                "late_val_std": tail_std(val_y[-late_val_count:]),
+                "late_val_std": late_val_std,
                 "final_train_val_gap": final_val_loss - final_train_loss,
                 "convergence_ratio": convergence_ratio,
                 "metrics_csv": str(run.metrics_csv),
@@ -496,8 +481,8 @@ def plot_main_knn_figure(
 ) -> None:
     configure_plot_style()
     colors = color_mapping(runs)
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5.2))
-    ax_curve, ax_drop, ax_summary = axes
+    fig, axes = plt.subplots(1, 2, figsize=(13.5, 5.2))
+    ax_curve, ax_summary = axes
 
     for run in runs:
         plot_smoothed_and_raw(ax_curve, run, run.val_series, colors[run.knn_connectivity], run.val_series.metric)
@@ -512,19 +497,6 @@ def plot_main_knn_figure(
     edge_colors = ["black" if int(value) == recommended_k else "none" for value in summary_df["knn_connectivity"]]
     edge_widths = [1.8 if int(value) == recommended_k else 0.0 for value in summary_df["knn_connectivity"]]
 
-    ax_drop.bar(
-        x_positions,
-        summary_df["early_val_drop_rate"],
-        color=bar_colors,
-        edgecolor=edge_colors,
-        linewidth=edge_widths,
-        width=0.68,
-    )
-    ax_drop.set_xticks(x_positions, knn_labels)
-    ax_drop.set_title("Early-stage Loss Drop Rate")
-    ax_drop.set_xlabel("KNN neighbors (K)")
-    ax_drop.set_ylabel("Average validation loss drop / progress")
-
     best_line = ax_summary.plot(
         x_positions,
         summary_df["best_val_loss"],
@@ -537,10 +509,10 @@ def plot_main_knn_figure(
         x_positions,
         summary_df["best_val_loss"],
         s=80,
-        color=[colors[int(value)] for value in summary_df["knn_connectivity"]],
+        color=bar_colors,
         zorder=3,
-        edgecolors="white",
-        linewidths=0.9,
+        edgecolors=edge_colors,
+        linewidths=edge_widths,
     )
     ax_summary.set_xticks(x_positions, knn_labels)
     ax_summary.set_title("Validation Plateau Summary")
@@ -627,7 +599,6 @@ def write_recommendation_report(
     summary_df: pd.DataFrame,
     recommended_k: int,
     output_path: Path,
-    early_fraction: float,
     late_fraction: float,
     improvement_threshold_pct: float,
     convergence_ratio_threshold: float,
@@ -643,13 +614,11 @@ def write_recommendation_report(
         f"- performance_gap_to_best_pct <= {performance_gap_threshold_pct:.2f}%",
         "",
         "Window configuration:",
-        f"- early_fraction = {early_fraction:.2f}",
         f"- late_fraction = {late_fraction:.2f}",
         "",
         "Recommended K metrics:",
         f"- best_val_loss = {format_optional(row['best_val_loss'])}",
         f"- final_val_loss = {format_optional(row['final_val_loss'])}",
-        f"- early_val_drop_rate = {format_optional(row['early_val_drop_rate'])}",
         f"- late_val_slope = {format_optional(row['late_val_slope'])}",
         f"- convergence_ratio = {format_optional(row['convergence_ratio'])}",
         f"- relative_improvement_vs_prev_k = {format_optional(row['relative_improvement_vs_prev_k'])}",
@@ -729,12 +698,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=positive_int,
         default=300,
         help="Saved image resolution in dots per inch.",
-    )
-    parser.add_argument(
-        "--early-fraction",
-        type=fraction_between_zero_and_one,
-        default=0.2,
-        help="Fraction of the training trajectory used to measure early-stage drop rate.",
     )
     parser.add_argument(
         "--late-fraction",
@@ -818,7 +781,6 @@ def run_knn_analysis_mode(args: argparse.Namespace) -> int:
 
     summary_df, recommended_k = build_summary_dataframe(
         runs=runs,
-        early_fraction=args.early_fraction,
         late_fraction=args.late_fraction,
         improvement_threshold_pct=args.improvement_threshold_pct,
         convergence_ratio_threshold=args.convergence_ratio_threshold,
@@ -853,7 +815,6 @@ def run_knn_analysis_mode(args: argparse.Namespace) -> int:
         summary_df=summary_df,
         recommended_k=recommended_k,
         output_path=recommendation_path,
-        early_fraction=args.early_fraction,
         late_fraction=args.late_fraction,
         improvement_threshold_pct=args.improvement_threshold_pct,
         convergence_ratio_threshold=args.convergence_ratio_threshold,

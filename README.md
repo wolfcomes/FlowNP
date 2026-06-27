@@ -58,9 +58,9 @@ evaluation_results/
 figures/
 ```
 
-The recommended way to share large data and checkpoints is through Zenodo or a similar archive, then reference the DOI here.
+Datasets and pretrained checkpoints are available from Zenodo:
 
-Zenodo archive: `TODO: add Zenodo DOI/link after release`
+https://zenodo.org/records/20893299
 
 After downloading the archive, place files under the local paths expected by the config files, for example:
 
@@ -95,30 +95,43 @@ Sample from a molecule-only checkpoint:
 ```bash
 python test.py \
   --model_dir checkpoints_coconut/<run-name> \
-  --output_file results/sample.sdf
+  --output_file results/sample.sdf \
+  --n_mols 100 \
+  --n_timesteps 250
 ```
 
 Sample from a protein-pocket conditioned checkpoint:
 
 ```bash
 python test_pocket.py \
-  --checkpoint checkpoints_crossdock/<run-name>/checkpoints/last.ckpt
+  --checkpoint checkpoints_crossdock/<run-name>/checkpoints/last.ckpt \
+  --pdb data/crossdock_example_pockets/<protein-pocket>.pdb \
+  --output_dir results/pocket_samples \
+  --n_mols_per_protein 10 \
+  --n_timesteps 250
 ```
+
+Use `--pdb` for a single protein-pocket PDB file, or `--pdb_dir` for a directory of PDB files. Optional reference ligands can be provided with `--ref_ligands_dir` when ligand-centered pocket alignment is needed.
 
 Adjust paths and command-line options for the local experiment setup.
 
 ## Evaluation
 
-The `scripts/` directory contains utilities for docking, molecular property analysis, NP/SA scoring, scaffold analysis, similarity analysis, t-SNE visualization, and loss-curve plotting.
+The `scripts/` directory contains utilities for docking, molecular property analysis, NP/SA scoring, scaffold analysis, similarity analysis, and t-SNE visualization.
 
 Examples:
 
 ```bash
-python scripts/plot_loss_curves.py --knn-root checkpoints_coconut
+python scripts/analyze_molecule_properities.py \
+  --input_files results/sample.csv results/reference.csv \
+  --smiles_cols SMILES smiles \
+  --output_dir evaluation_results/molecule_properties \
+  --n_molecules 1000
+
 python scripts/docking_multi.py
 ```
 
-Docking scripts expect local receptor/ligand files and an available `smina` executable.
+`analyze_molecule_properities.py` computes molecular property tables and distribution plots from one or more CSV files. Docking scripts expect local receptor/ligand files and an available `smina` executable.
 
 ## Repository Hygiene
 

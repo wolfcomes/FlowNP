@@ -38,11 +38,14 @@ Some evaluation scripts require external command-line tools or optional packages
 
 ## Data And Checkpoints
 
-Large artifacts are not tracked in this repository. This includes:
+Datasets and pretrained checkpoints are not tracked in this repository. The release archive provides:
 
 - raw datasets
 - processed `.pt` tensors
 - trained model checkpoints
+
+Generated outputs are also excluded from git, but they are not included in the Zenodo archive. These are expected to be produced locally when running sampling, docking, and evaluation workflows:
+
 - generated `.sdf` files
 - docking outputs
 - evaluation result tables and figures
@@ -142,7 +145,7 @@ git status --short
 git diff --stat
 ```
 
-Do not commit local datasets, processed tensors, checkpoints, generated molecules, docking outputs, or evaluation artifacts. Use an external archive such as Zenodo for those files.
+Do not commit local datasets, processed tensors, checkpoints, generated molecules, docking outputs, or evaluation artifacts. The Zenodo record above provides the datasets and pretrained checkpoints; generated molecules, docking outputs, and evaluation artifacts should be regenerated locally as needed.
 
 ## Citation
 

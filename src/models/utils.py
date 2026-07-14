@@ -289,7 +289,7 @@ def campbell_step_pocket(p_1_given_t: torch.Tensor,
     x1_no_pocket = Categorical(p_1_given_t_no_pocket).sample() # has shape (num_nodes,)
 
     mask_prob = dt*stochasticity
-    unmask_prob = 1.5*dt*( alpha_t_prime + stochasticity*alpha_t  ) / (1 - alpha_t)
+    unmask_prob = dt*( alpha_t_prime + stochasticity*alpha_t  ) / (1 - alpha_t)
     # unmask_prob = alpha_t + mask_prob - (xt != mask_index).float().mean().item()
     
     mask_prob = torch.clamp(mask_prob, min=0, max=1)

@@ -12,6 +12,24 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
+# 尝试导入NP_Score
+NP_score_dir = os.path.join(script_dir, "NP_Score")
+sys.path.append(NP_score_dir)
+NP_MODEL = None
+scoreMol = None
+try:
+    from npscorer import readNPModel, scoreMol
+    model_file = os.path.join(NP_score_dir, "publicnp.model.gz")
+    if os.path.exists(model_file):
+        NP_MODEL = readNPModel(model_file)
+        print("成功加载NP_Score模型")
+    else:
+        print(f"警告：NP_Score模型文件不存在: {model_file}")
+except ImportError:
+    print("警告：无法导入NP_Score模块，NP_likeness将不会被计算")
+except Exception as e:
+    print(f"警告：加载NP_Score模型时出错: {e}")
+
 # 尝试导入自定义SA_Score
 SA_score_dir = os.path.join(script_dir, "SA_Score")
 sys.path.append(SA_score_dir)
@@ -45,6 +63,16 @@ def calculate_molecular_properties(mol):
         sa_score = sascorer.calculateScore(mol)
     else:
         sa_score = None
+
+    # 计算NP-likeness分数
+    if NP_MODEL is not None and scoreMol is not None:
+        try:
+            np_likeness = scoreMol(mol, NP_MODEL)
+        except Exception as e:
+            logging.warning(f"计算NP_likeness时出错: {e}")
+            np_likeness = None
+    else:
+        np_likeness = None
     
     # 计算QED
     try:
@@ -69,6 +97,7 @@ def calculate_molecular_properties(mol):
         'TPSA': tpsa,
         'QED': qed,
         'SA_Score': sa_score,
+        'NP_likeness': np_likeness,
         'Lipinski_Score': lipinski_score
     }
 

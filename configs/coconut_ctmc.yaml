@@ -34,9 +34,9 @@ interpolant_scheduler:
     x: linear
 lr_scheduler:
   base_lr: 0.00025
-  restart_interval: 19
+  restart_interval: 47
   restart_type: cosine
-  warmup_length: 1.0
+  warmup_length: 3.0
   weight_decay: 1.0e-12
 mol_fm:
   prior_config:
@@ -91,12 +91,12 @@ vector_field:
   message_norm: 100
   n_cp_feats: 4
   n_hidden_edge_feats: 256
-  n_hidden_scalars: 512
+  n_hidden_scalars: 256
   n_message_gvps: 4
   n_molecule_updates: 8
   n_recycles: 1
   n_update_gvps: 4
-  n_vec_channels: 64
+  n_vec_channels: 128
   rbf_dim: 32
   rbf_dmax: 14
   separate_mol_updaters: true

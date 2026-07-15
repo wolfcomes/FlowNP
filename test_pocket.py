@@ -330,7 +330,7 @@ def parse_args():
     p.add_argument('--frag_file', type=Path, help='Path to fragment file', default=None)
 
     p.add_argument('--n_atoms_per_mol', type=int, default=None, help="The number of atoms in every molecule. If None, it will be sampled from the training data distribution.")
-    p.add_argument('--n_timesteps', type=int, default=20, help="Number of timesteps for integration.")
+    p.add_argument('--n_timesteps', type=int, default=250, help="Number of timesteps for integration.")
     p.add_argument('--xt_traj', action='store_true', help='Save the x-t trajectory of the sampled molecules.')
     p.add_argument('--ep_traj', action='store_true', help='Save the endpoint trajectory of the sampled molecules.')
     p.add_argument('--metrics', action='store_true', help='Compute metrics on the sampled molecules.')

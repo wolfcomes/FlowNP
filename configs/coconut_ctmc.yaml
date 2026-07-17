@@ -82,7 +82,7 @@ training:
     gradient_clip_algorithm: value
     gradient_clip_val: 1.0
     limit_val_batches: 1.0
-    max_epochs: 20
+    max_epochs: 50
     num_nodes: 1
     strategy: auto
 vector_field:
